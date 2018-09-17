@@ -11,7 +11,7 @@ pkg_search_module(GLFW REQUIRED glfw3)
 find_package(Vulkan REQUIRED)
 
 include_directories(${GLFW_INCLUDE_DIRS} Vulkan::Vulkan)
-set(SOURCES test.cpp)
+set(SOURCES triangleMain.cpp)
 
 add_executable(vulkan ${SOURCES})
 target_link_libraries(vulkan ${GLFW_LIBRARIES} Vulkan::Vulkan)

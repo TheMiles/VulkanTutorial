@@ -14,6 +14,14 @@ const int WIDTH   = 800;
 const int HEIGHT  = 600;
 const char* TITLE = "Vulkan";
 
+const char* DEBUG_EXTENSION = "VK_EXT_debug_report";
+
+const std::vector<const char*> requestedExtensions = {
+#ifndef NDEBUG
+    DEBUG_EXTENSION
+#endif
+};
+
 const std::vector<const char*> validationLayers = {
 #ifndef NDEBUG
     "VK_LAYER_LUNARG_standard_validation"
@@ -79,22 +87,25 @@ private:
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.apiVersion = VK_API_VERSION_1_0;
 
-        uint32_t glfwExtensionCount = 0;
-        const char** glfwExtensions;
-        glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+        std::vector<const char*> requiredExtensions = getRequiredExtensions();
+        requiredExtensions.insert(requiredExtensions.end(), requestedExtensions.begin(), requestedExtensions.end());
 
+        std::cout << "EXTENSIONS" << std::endl;
+        auto e = enumerateExtensions();
+        for(auto l: e)
+        {
+            std::cout << "\t" << l.extensionName << std::endl;
+        }
 
         std::cout << "checking required extensions:" << std::endl;
-
-        if(isExtensionAvailable(glfwExtensions,glfwExtensionCount))
+        if(isExtensionAvailable(requiredExtensions))
         {
             std::cout << "\tAll needed extensions are available" << std::endl;
         }
         else
         {
-            for (uint32_t i = 0; i < glfwExtensionCount; ++i)
+            for(const char* extensionNeeded: requiredExtensions)
             {
-                const char* extensionNeeded = glfwExtensions[i];
                 if(!isExtensionAvailable(extensionNeeded))
                 {
                     std::cout << "\tERROR " << extensionNeeded << " is not available" << std::endl;
@@ -121,13 +132,13 @@ private:
         }
 
 
-        VkInstanceCreateInfo createInfo = {};
-        createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-        createInfo.pApplicationInfo = &appInfo;
-        createInfo.enabledExtensionCount = glfwExtensionCount;
-        createInfo.ppEnabledExtensionNames = glfwExtensions;
-        createInfo.enabledLayerCount = validationLayers.size();
-        createInfo.ppEnabledLayerNames = validationLayers.data();
+        VkInstanceCreateInfo createInfo    = {};
+        createInfo.sType                   = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+        createInfo.pApplicationInfo        = &appInfo;
+        createInfo.enabledExtensionCount   = requiredExtensions.size();
+        createInfo.ppEnabledExtensionNames = requiredExtensions.data();
+        createInfo.enabledLayerCount       = validationLayers.size();
+        createInfo.ppEnabledLayerNames     = validationLayers.data();
 
         if( vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS )
         {
@@ -204,6 +215,13 @@ private:
         return availableLayers;
     }
 
+    std::vector<const char*> getRequiredExtensions()
+    {
+        uint32_t glfwExtensionCount = 0;
+        const char** glfwExtensions;
+        glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+        return std::vector<const char*>(glfwExtensions, glfwExtensions + glfwExtensionCount);
+    }
 
     GLFWwindow* window = nullptr;
     VkInstance  instance;

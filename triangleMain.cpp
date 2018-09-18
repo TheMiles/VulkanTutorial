@@ -14,6 +14,12 @@ const int WIDTH   = 800;
 const int HEIGHT  = 600;
 const char* TITLE = "Vulkan";
 
+const std::vector<const char*> validationLayers = {
+#ifndef NDEBUG
+    "VK_LAYER_LUNARG_standard_validation"
+#endif
+};
+
 class HelloTriangleApplication
 {
 public:
@@ -97,13 +103,31 @@ private:
             throw std::runtime_error("failed to create instance!");
         }
 
+        std::cout << "checking requested layers:" << std::endl;
+        if(isLayerAvailable(validationLayers))
+        {
+            std::cout << "\tAll " << validationLayers.size() << " requested layers are available" << std::endl;
+        }
+        else
+        {
+            for(const char* layerName: validationLayers)
+            {
+                if(!isLayerAvailable(layerName))
+                {
+                    std::cout << "\tERROR " << layerName << " is not available" << std::endl;
+                }
+            }
+            throw std::runtime_error("failed to create instance!");
+        }
+
 
         VkInstanceCreateInfo createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         createInfo.pApplicationInfo = &appInfo;
         createInfo.enabledExtensionCount = glfwExtensionCount;
         createInfo.ppEnabledExtensionNames = glfwExtensions;
-        createInfo.enabledLayerCount = 0;
+        createInfo.enabledLayerCount = validationLayers.size();
+        createInfo.ppEnabledLayerNames = validationLayers.data();
 
         if( vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS )
         {
@@ -134,6 +158,30 @@ private:
         return isAvailable;
     }
 
+    bool isLayerAvailable(const char* layerName)
+    {
+        return isLayerAvailable(&layerName, 1);
+    }
+
+    bool isLayerAvailable(const char** layerNames, const int layerCount)
+    {
+        return isLayerAvailable(std::vector<const char*>(layerNames, layerNames + layerCount));
+    }
+
+    bool isLayerAvailable(const std::vector<const char*>& layerNames)
+    {
+        bool isAvailable = true;
+        std::vector<VkLayerProperties> layersAvailable = enumerateLayers();
+
+        for (const char* layerNeeded: layerNames)
+        {
+            isAvailable &= std::any_of(layersAvailable.begin(), layersAvailable.end(),
+                                       [&layerNeeded](VkLayerProperties& property){return std::strcmp(layerNeeded,property.layerName) == 0;});
+        }
+
+        return isAvailable;
+    }
+
     std::vector<VkExtensionProperties> enumerateExtensions()
     {
         uint32_t extensionCount = 0;
@@ -144,6 +192,18 @@ private:
 
         return extensions;
     }
+
+    std::vector<VkLayerProperties> enumerateLayers()
+    {
+        uint32_t layerCount = 0;
+        vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+
+        std::vector<VkLayerProperties> availableLayers(layerCount);
+        vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+
+        return availableLayers;
+    }
+
 
     GLFWwindow* window = nullptr;
     VkInstance  instance;

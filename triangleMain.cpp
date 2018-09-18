@@ -4,7 +4,9 @@
 #include <iostream>
 #include <stdexcept>
 #include <functional>
+#include <algorithm>
 #include <cstdlib>
+#include <cstring>
 #include <vector>
 
 
@@ -18,7 +20,6 @@ public:
     HelloTriangleApplication()
     {
         initWindow();
-        enumerateExtensions();
         initVulkan();
     }
 
@@ -76,6 +77,27 @@ private:
         const char** glfwExtensions;
         glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
+
+        std::cout << "checking required extensions:" << std::endl;
+
+        if(isExtensionAvailable(glfwExtensions,glfwExtensionCount))
+        {
+            std::cout << "\tAll needed extensions are available" << std::endl;
+        }
+        else
+        {
+            for (uint32_t i = 0; i < glfwExtensionCount; ++i)
+            {
+                const char* extensionNeeded = glfwExtensions[i];
+                if(!isExtensionAvailable(extensionNeeded))
+                {
+                    std::cout << "\tERROR " << extensionNeeded << " is not available" << std::endl;
+                }
+            }
+            throw std::runtime_error("failed to create instance!");
+        }
+
+
         VkInstanceCreateInfo createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         createInfo.pApplicationInfo = &appInfo;
@@ -89,7 +111,30 @@ private:
         }
     }
 
-    void enumerateExtensions()
+    bool isExtensionAvailable(const char* extensionName)
+    {
+        return isExtensionAvailable(&extensionName, 1);
+    }
+
+    bool isExtensionAvailable(const char** extensionNames, const int extensionCount)
+    {
+        return isExtensionAvailable(std::vector<const char*> (extensionNames, extensionNames + extensionCount));
+    }
+    bool isExtensionAvailable(const std::vector<const char*>& extensionNames)
+    {
+        bool isAvailable = true;
+        std::vector<VkExtensionProperties> extensionsAvailable = enumerateExtensions();
+
+        for (const char* extensionNeeded: extensionNames)
+        {
+            isAvailable &= std::any_of(extensionsAvailable.begin(), extensionsAvailable.end(),
+                                       [&extensionNeeded](VkExtensionProperties& ext){return std::strcmp(extensionNeeded,ext.extensionName) == 0;});
+        }
+
+        return isAvailable;
+    }
+
+    std::vector<VkExtensionProperties> enumerateExtensions()
     {
         uint32_t extensionCount = 0;
         vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
@@ -97,11 +142,7 @@ private:
         std::vector<VkExtensionProperties> extensions(extensionCount);
         vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
 
-        std::cout << "available extensions:" << std::endl;
-        for (const auto& extension : extensions)
-        {
-            std::cout << "\t" << extension.extensionName << std::endl;
-        }
+        return extensions;
     }
 
     GLFWwindow* window = nullptr;

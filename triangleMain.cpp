@@ -28,6 +28,26 @@ const std::vector<const char*> validationLayers = {
 #endif
 };
 
+
+VkResult CreateDebugReportCallbackEXT(VkInstance& instance, const VkDebugReportCallbackCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugReportCallbackEXT* pCallback)
+{
+    auto func = (PFN_vkCreateDebugReportCallbackEXT) vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
+    if (func != nullptr) {
+        return func(instance, pCreateInfo, pAllocator, pCallback);
+    } else {
+        return VK_ERROR_EXTENSION_NOT_PRESENT;
+    }
+}
+
+void DestroyDebugReportCallbackEXT(VkInstance& instance, VkDebugReportCallbackEXT& callback, const VkAllocationCallbacks* pAllocator = nullptr)
+{
+    auto func = (PFN_vkDestroyDebugReportCallbackEXT) vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
+    if(func)
+    {
+        func(instance, callback, pAllocator);
+    }
+}
+
 class HelloTriangleApplication
 {
 public:
@@ -72,6 +92,11 @@ private:
 
     void cleanup()
     {
+        if(stringsAreSubsetOfCollection({DEBUG_EXTENSION}, requestedExtensions))
+        {
+            DestroyDebugReportCallbackEXT(instance, callback);
+        }
+
         vkDestroyInstance(instance, nullptr);
         glfwDestroyWindow(window);
         glfwTerminate();
@@ -143,6 +168,18 @@ private:
         if( vkCreateInstance(&createInfo, nullptr, &instance) != VK_SUCCESS )
         {
             throw std::runtime_error("failed to create instance!");
+        }
+
+        if(stringsAreSubsetOfCollection({DEBUG_EXTENSION}, requestedExtensions))
+        {
+            VkDebugReportCallbackCreateInfoEXT callbackInfo = {};
+            callbackInfo.sType   = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
+            callbackInfo.flags   = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
+            callbackInfo.pfnCallback = debugCallback;
+            if (CreateDebugReportCallbackEXT(instance, &callbackInfo, nullptr, &callback) != VK_SUCCESS)
+            {
+                throw std::runtime_error("failed to create debug callbacks");
+            }
         }
     }
 
@@ -216,8 +253,24 @@ private:
         return std::vector<const char*>(glfwExtensions, glfwExtensions + glfwExtensionCount);
     }
 
+
+    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+        VkDebugReportFlagsEXT                       /*flags*/,
+        VkDebugReportObjectTypeEXT                  /*objectType*/,
+        uint64_t                                    /*object*/,
+        size_t                                      /*location*/,
+        int32_t                                     /*messageCode*/,
+        const char*                                 pLayerPrefix,
+        const char*                                 pMessage,
+        void*                                       /*pUserData*/)
+    {
+        std::cerr << "validation layer " << pLayerPrefix << ": " << pMessage << std::endl;
+        return VK_FALSE;
+    }
+
     GLFWwindow* window = nullptr;
     VkInstance  instance;
+    VkDebugReportCallbackEXT callback;
 };
 
 int main()

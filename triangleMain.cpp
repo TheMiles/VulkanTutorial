@@ -157,16 +157,7 @@ private:
     }
     bool isExtensionAvailable(const std::vector<const char*>& extensionNames)
     {
-        bool isAvailable = true;
-        std::vector<VkExtensionProperties> extensionsAvailable = enumerateExtensions();
-
-        for (const char* extensionNeeded: extensionNames)
-        {
-            isAvailable &= std::any_of(extensionsAvailable.begin(), extensionsAvailable.end(),
-                                       [&extensionNeeded](VkExtensionProperties& ext){return std::strcmp(extensionNeeded,ext.extensionName) == 0;});
-        }
-
-        return isAvailable;
+        return stringsAreSubsetOfCollection<VkExtensionProperties>(extensionNames, enumerateExtensions(), [](const VkExtensionProperties& p){return p.extensionName;});
     }
 
     bool isLayerAvailable(const char* layerName)
@@ -181,16 +172,18 @@ private:
 
     bool isLayerAvailable(const std::vector<const char*>& layerNames)
     {
-        bool isAvailable = true;
-        std::vector<VkLayerProperties> layersAvailable = enumerateLayers();
+        return stringsAreSubsetOfCollection<VkLayerProperties>(layerNames, enumerateLayers(), [](const VkLayerProperties& p){return p.layerName;});
+    }
 
-        for (const char* layerNeeded: layerNames)
+    template<typename T>
+    bool stringsAreSubsetOfCollection(const std::vector<const char*>& subset, const std::vector<T>& collection, std::function<const char*(const T&)> accessor = [](const auto &c){return c;})
+    {
+        bool isSubset = true;
+        for (const auto s: subset)
         {
-            isAvailable &= std::any_of(layersAvailable.begin(), layersAvailable.end(),
-                                       [&layerNeeded](VkLayerProperties& property){return std::strcmp(layerNeeded,property.layerName) == 0;});
+            isSubset &= std::any_of(collection.begin(), collection.end(), [&](const T& c){return std::strcmp(s,accessor(c)) == 0;});
         }
-
-        return isAvailable;
+        return isSubset;
     }
 
     std::vector<VkExtensionProperties> enumerateExtensions()

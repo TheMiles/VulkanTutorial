@@ -30,6 +30,10 @@ const std::vector<const char*> validationLayers = {
 #endif
 };
 
+const std::vector<const char*> deviceExtensions = {
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME
+};
+
 
 VkResult CreateDebugReportCallbackEXT(VkInstance& instance, const VkDebugReportCallbackCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugReportCallbackEXT* pCallback)
 {
@@ -216,6 +220,20 @@ private:
         return stringsAreSubsetOfCollection<VkExtensionProperties>(extensionNames, enumerateExtensions(), [](const VkExtensionProperties& p){return p.extensionName;});
     }
 
+    bool isDeviceExtensionAvailable(VkPhysicalDevice device, const char* extensionName)
+    {
+        return isDeviceExtensionAvailable(device, &extensionName, 1);
+    }
+
+    bool isDeviceExtensionAvailable(VkPhysicalDevice device, const char** extensionNames, const int extensionCount)
+    {
+        return isDeviceExtensionAvailable(device, std::vector<const char*> (extensionNames, extensionNames + extensionCount));
+    }
+    bool isDeviceExtensionAvailable(VkPhysicalDevice device, const std::vector<const char*>& extensionNames)
+    {
+        return stringsAreSubsetOfCollection<VkExtensionProperties>(extensionNames, enumerateDeviceExtensions(device), [](const VkExtensionProperties& p){return p.extensionName;});
+    }
+
     bool isLayerAvailable(const char* layerName)
     {
         return isLayerAvailable(&layerName, 1);
@@ -249,6 +267,17 @@ private:
 
         std::vector<VkExtensionProperties> extensions(extensionCount);
         vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
+
+        return extensions;
+    }
+
+    std::vector<VkExtensionProperties> enumerateDeviceExtensions(VkPhysicalDevice device)
+    {
+        uint32_t extensionCount;
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, nullptr);
+
+        std::vector<VkExtensionProperties> extensions(extensionCount);
+        vkEnumerateDeviceExtensionProperties(device, nullptr, &extensionCount, extensions.data());
 
         return extensions;
     }
@@ -362,8 +391,15 @@ private:
         isSuitable &= deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
         isSuitable &= deviceFeatures.geometryShader;
         isSuitable &= queueIndices.isComplete();
+        isSuitable &= isDeviceExtensionAvailable(device, deviceExtensions);
 
         std::cout << "Checking " << deviceProperties.deviceName << (isSuitable ? " is suitable" : " is NOT suitable") << std::endl;
+        // std::cout << "\tExtensions:" << std::endl;
+        // std::vector<VkExtensionProperties> extensions = enumerateDeviceExtensions(device);
+        // for(const auto& e: extensions)
+        // {
+        //     std::cout << "\t\t" << e.extensionName << std::endl;
+        // }
         return isSuitable;
     }
 
@@ -393,7 +429,8 @@ private:
         createInfo.pQueueCreateInfos                = queueCreateInfos.data();
         createInfo.queueCreateInfoCount             = static_cast<uint32_t>(queueCreateInfos.size());
         createInfo.pEnabledFeatures                 = &deviceFeatures;
-        createInfo.enabledExtensionCount            = 0;
+        createInfo.enabledExtensionCount            = static_cast<uint32_t>(deviceExtensions.size());
+        createInfo.ppEnabledExtensionNames          = deviceExtensions.data();
         createInfo.enabledLayerCount                = static_cast<uint32_t>(validationLayers.size());
         createInfo.ppEnabledLayerNames              = validationLayers.data();
 

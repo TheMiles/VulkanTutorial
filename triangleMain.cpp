@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <vector>
+#include <optional>
 
 
 const int WIDTH   = 800;
@@ -48,6 +49,16 @@ void DestroyDebugReportCallbackEXT(VkInstance& instance, VkDebugReportCallbackEX
     }
 }
 
+struct QueueFamilyIndices
+{
+    std::optional<uint32_t> graphicsFamily;
+
+    bool isComplete()
+    {
+        return graphicsFamily.has_value();
+    }
+};
+
 class HelloTriangleApplication
 {
 public:
@@ -80,6 +91,7 @@ private:
     void initVulkan()
     {
         createInstance();
+        pickPhysicalDevice();
     }
 
     void mainLoop()
@@ -234,6 +246,14 @@ private:
         return extensions;
     }
 
+    std::vector<const char*> getRequiredExtensions()
+    {
+        uint32_t glfwExtensionCount = 0;
+        const char** glfwExtensions;
+        glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+        return std::vector<const char*>(glfwExtensions, glfwExtensions + glfwExtensionCount);
+    }
+
     std::vector<VkLayerProperties> enumerateLayers()
     {
         uint32_t layerCount = 0;
@@ -245,12 +265,13 @@ private:
         return availableLayers;
     }
 
-    std::vector<const char*> getRequiredExtensions()
+    std::vector<VkPhysicalDevice> enumeratePhysicalDevices()
     {
-        uint32_t glfwExtensionCount = 0;
-        const char** glfwExtensions;
-        glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-        return std::vector<const char*>(glfwExtensions, glfwExtensions + glfwExtensionCount);
+        uint32_t deviceCount = 0;
+        vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+        std::vector<VkPhysicalDevice> devices(deviceCount);
+        vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
+        return devices;
     }
 
 
@@ -268,9 +289,73 @@ private:
         return VK_FALSE;
     }
 
+    void pickPhysicalDevice()
+    {
+        for (const auto& device : enumeratePhysicalDevices())
+        {
+            if (isDeviceSuitable(device))
+            {
+                physicalDevice = device;
+                break;
+            }
+        }
+
+        if (physicalDevice == VK_NULL_HANDLE)
+        {
+            throw std::runtime_error("failed to find a suitable GPU!");
+        }
+
+    }
+
+    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, VkQueueFlags desiredFlags = VK_QUEUE_GRAPHICS_BIT)
+    {
+        QueueFamilyIndices indices;
+
+        uint32_t queueFamilyCount = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+        std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+        vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+        int i = 0;
+        for (const auto& queueFamily : queueFamilies)
+        {
+            if (queueFamily.queueCount > 0 && queueFamily.queueFlags & desiredFlags)
+            {
+                indices.graphicsFamily = i;
+            }
+
+            if (indices.isComplete())
+            {
+                break;
+            }
+
+            i++;
+        }
+        return indices;
+    }
+
+    bool isDeviceSuitable(VkPhysicalDevice device)
+    {
+        VkPhysicalDeviceProperties deviceProperties;
+        VkPhysicalDeviceFeatures deviceFeatures;
+        vkGetPhysicalDeviceProperties(device, &deviceProperties);
+        vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+        QueueFamilyIndices queueIndices = findQueueFamilies(device);
+
+        bool isSuitable = true;
+        isSuitable &= deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU;
+        isSuitable &= deviceFeatures.geometryShader;
+        isSuitable &= queueIndices.isComplete();
+
+        std::cout << "Checking " << deviceProperties.deviceName << (isSuitable ? " is suitable" : " is NOT suitable") << std::endl;
+        return isSuitable;
+    }
+
     GLFWwindow* window = nullptr;
     VkInstance  instance;
     VkDebugReportCallbackEXT callback;
+    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 };
 
 int main()

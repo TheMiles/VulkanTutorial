@@ -91,6 +91,7 @@ private:
     void initVulkan()
     {
         createInstance();
+        createSurface();
         pickPhysicalDevice();
         createLogicalDevice();
     }
@@ -112,6 +113,7 @@ private:
             DestroyDebugReportCallbackEXT(instance, callback);
         }
 
+        vkDestroySurfaceKHR(instance, surface, nullptr);
         vkDestroyInstance(instance, nullptr);
         glfwDestroyWindow(window);
         glfwTerminate();
@@ -386,9 +388,18 @@ private:
         vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
     }
 
+    void createSurface()
+    {
+        if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to create window surface!");
+        }
+    }
+
     GLFWwindow*              window         = nullptr;
     VkInstance               instance;
     VkDebugReportCallbackEXT callback;
+    VkSurfaceKHR             surface;
     VkPhysicalDevice         physicalDevice = VK_NULL_HANDLE;
     VkDevice                 device;
     VkQueue                  graphicsQueue;

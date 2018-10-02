@@ -99,9 +99,17 @@ private:
         glfwInit();
 
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
         window = glfwCreateWindow(WIDTH, HEIGHT, TITLE, nullptr, nullptr);
+        glfwSetWindowUserPointer(window, this);
+        glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
     }
+
+    static void framebufferResizeCallback(GLFWwindow* window, int width, int height)
+    {
+        auto app = reinterpret_cast<HelloTriangleApplication*>(glfwGetWindowUserPointer(window));
+        app->framebufferResized = true;
+    }
+
 
     void initVulkan()
     {
@@ -122,6 +130,13 @@ private:
 
     void recreateSwapChain()
     {
+        int width = 0, height = 0;
+        while (width == 0 || height == 0)
+        {
+            glfwGetFramebufferSize(window, &width, &height);
+            glfwWaitEvents();
+        }
+
         vkDeviceWaitIdle(device);
 
         cleanupSwapChain();
@@ -1022,10 +1037,19 @@ private:
     void drawFrame()
     {
         vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, std::numeric_limits<uint64_t>::max());
-        vkResetFences(device, 1, &inFlightFences[currentFrame]);
 
         uint32_t imageIndex;
-        vkAcquireNextImageKHR(device, swapChain, std::numeric_limits<uint64_t>::max(), imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+        VkResult result = vkAcquireNextImageKHR(device, swapChain, std::numeric_limits<uint64_t>::max(), imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
+
+        if (result == VK_ERROR_OUT_OF_DATE_KHR)
+        {
+            recreateSwapChain();
+            return;
+        }
+        else if(result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+        {
+            throw std::runtime_error("failed to acquire swap chain image!");
+        }
 
         VkSemaphore waitSemaphores[]      = {imageAvailableSemaphores[currentFrame]};
         VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
@@ -1041,6 +1065,7 @@ private:
         submitInfo.signalSemaphoreCount   = 1;
         submitInfo.pSignalSemaphores      = signalSemaphores;
 
+        vkResetFences(device, 1, &inFlightFences[currentFrame]);
         if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS)
         {
             throw std::runtime_error("failed to submit draw command buffer!");
@@ -1056,7 +1081,17 @@ private:
         presentInfo.pImageIndices         = &imageIndex;
         presentInfo.pResults              = nullptr; // Optional
 
-        vkQueuePresentKHR(presentQueue, &presentInfo);
+        result = vkQueuePresentKHR(presentQueue, &presentInfo);
+
+        if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized)
+        {
+            recreateSwapChain();
+        }
+        else if (result != VK_SUCCESS)
+        {
+            throw std::runtime_error("failed to present swap chain image!");
+        }
+
 
         currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
@@ -1083,7 +1118,8 @@ private:
     std::vector<VkSemaphore>     imageAvailableSemaphores;
     std::vector<VkSemaphore>     renderFinishedSemaphores;
     std::vector<VkFence>         inFlightFences;
-    size_t                       currentFrame = 0;
+    size_t                       currentFrame       = 0;
+    bool                         framebufferResized = false;
 };
 
 int main()

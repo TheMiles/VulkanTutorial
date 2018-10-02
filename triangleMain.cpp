@@ -119,6 +119,22 @@ private:
         createSyncObjects();
     }
 
+
+    void recreateSwapChain()
+    {
+        vkDeviceWaitIdle(device);
+
+        cleanupSwapChain();
+
+        createSwapChain();
+        createImageViews();
+        createRenderPass();
+        createGraphicsPipeline();
+        createFramebuffers();
+        createCommandBuffers();
+    }
+
+
     void mainLoop()
     {
         while(!glfwWindowShouldClose(window))
@@ -130,20 +146,15 @@ private:
         vkDeviceWaitIdle(device);
     }
 
-    void cleanup()
+    void cleanupSwapChain()
     {
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-            vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
-            vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
-            vkDestroyFence(device, inFlightFences[i], nullptr);
-        }
-
-        vkDestroyCommandPool(device, commandPool, nullptr);
 
         for (auto framebuffer : swapChainFramebuffers)
         {
             vkDestroyFramebuffer(device, framebuffer, nullptr);
         }
+
+        vkFreeCommandBuffers(device, commandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
 
         vkDestroyPipeline(device, graphicsPipeline, nullptr);
         vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
@@ -155,6 +166,21 @@ private:
         }
 
         vkDestroySwapchainKHR(device, swapChain, nullptr);
+    }
+
+    void cleanup()
+    {
+        cleanupSwapChain();
+
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+            vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
+            vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
+            vkDestroyFence(device, inFlightFences[i], nullptr);
+        }
+
+        vkDestroyCommandPool(device, commandPool, nullptr);
+
+
         vkDestroyDevice(device, nullptr);
 
         if(stringsAreSubsetOfCollection({DEBUG_EXTENSION}, requestedExtensions))
@@ -564,13 +590,18 @@ private:
         {
             return capabilities.currentExtent;
         }
+        else
+        {
+            int width, height;
+            glfwGetFramebufferSize(window, &width, &height);
 
-        VkExtent2D actualExtent = {WIDTH, HEIGHT};
+            VkExtent2D actualExtent = { static_cast<uint32_t>(width), static_cast<uint32_t>(height) };
 
-        actualExtent.width  = std::max(capabilities.minImageExtent.width,  std::min(capabilities.maxImageExtent.width,  actualExtent.width));
-        actualExtent.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, actualExtent.height));
+            actualExtent.width  = std::max(capabilities.minImageExtent.width,  std::min(capabilities.maxImageExtent.width,  actualExtent.width));
+            actualExtent.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, actualExtent.height));
 
-        return actualExtent;
+            return actualExtent;
+        }
     }
 
     void createSwapChain()

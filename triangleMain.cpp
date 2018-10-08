@@ -1627,6 +1627,8 @@ private:
     std::vector<VkDescriptorSet> descriptorSets;
     VkImage                      textureImage;
     VkDeviceMemory               textureImageMemory;
+    VkImageView                  textureImageView;
+
 };
 
 int main()

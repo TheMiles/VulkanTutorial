@@ -32,3 +32,8 @@ file(GLOB texture_files RELATIVE ${PROJECT_SOURCE_DIR} "textures/*")
 foreach(texture_file ${texture_files})
     configure_file("${texture_file}" "${texture_file}" COPYONLY)
 endforeach(texture_file)
+
+file(GLOB model_files RELATIVE ${PROJECT_SOURCE_DIR} "models/*")
+foreach(model_file ${model_files})
+    configure_file("${model_file}" "${model_file}" COPYONLY)
+endforeach(model_file)

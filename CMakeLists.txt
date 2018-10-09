@@ -15,7 +15,7 @@ find_package(glm REQUIRED)
 
 find_package(Vulkan REQUIRED)
 
-include_directories(${GLFW_INCLUDE_DIRS} Vulkan::Vulkan external/stb)
+include_directories(${GLFW_INCLUDE_DIRS} Vulkan::Vulkan external/stb external/tinyobjloader)
 set(SOURCES triangleMain.cpp)
 
 add_executable(vulkan ${SOURCES})
